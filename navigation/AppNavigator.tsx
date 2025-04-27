@@ -7,6 +7,8 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import FoodRecognitionScreen from '../screens/FoodRecognitionScreen';
 import UserScreen from '../screens/UserScreen';
+import HistoryScreen from '../screens/HistoryScreen';
+import RecordDetailScreen from '../screens/RecordDetailScreen';
 import { AuthContext } from '../App';
 
 const Stack = createStackNavigator();
@@ -19,6 +21,20 @@ const AuthStack = () => (
   </Stack.Navigator>
 );
 
+const FoodStack = () => (
+  <Stack.Navigator>
+    <Stack.Screen name="FoodRecognitionMain" component={FoodRecognitionScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="RecordDetail" component={RecordDetailScreen} options={{ title: 'Record Details' }} />
+  </Stack.Navigator>
+);
+
+const HistoryStack = () => (
+  <Stack.Navigator>
+    <Stack.Screen name="HistoryMain" component={HistoryScreen} options={{ headerShown: false }} />
+    <Stack.Screen name="RecordDetail" component={RecordDetailScreen} options={{ title: 'Record Details' }} />
+  </Stack.Navigator>
+);
+
 const MainTabs = () => (
   <Tab.Navigator
     screenOptions={({ route }) => ({
@@ -27,6 +43,8 @@ const MainTabs = () => (
 
         if (route.name === 'FoodRecognition') {
           iconName = focused ? 'camera' : 'camera-outline';
+        } else if (route.name === 'History') {
+          iconName = focused ? 'time' : 'time-outline';
         } else if (route.name === 'Profile') {
           iconName = focused ? 'person' : 'person-outline';
         }
@@ -35,7 +53,8 @@ const MainTabs = () => (
       },
     })}
   >
-    <Tab.Screen name="FoodRecognition" component={FoodRecognitionScreen} options={{ title: 'Recognize Food' }} />
+    <Tab.Screen name="FoodRecognition" component={FoodStack} options={{ title: 'Recognize Food', headerShown: false }} />
+    <Tab.Screen name="History" component={HistoryStack} options={{ title: 'History', headerShown: false }} />
     <Tab.Screen name="Profile" component={UserScreen} options={{ title: 'Profile' }} />
   </Tab.Navigator>
 );

@@ -1,15 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, Text, ScrollView, Image, Alert } from 'react-native';
+import { View, StyleSheet, Text, ScrollView, Image, Alert, TouchableOpacity } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import Button from '../components/Button';
-import { recognizeFood, getFoodRecognitionStatus, getFoodRecognitionResult, FoodRecognitionResult, FoodItem } from '../services/api';
+import RecordForm from '../components/RecordForm';
+import { 
+  recognizeFood, 
+  getFoodRecognitionStatus, 
+  getFoodRecognitionResult, 
+  editFoodRecognitionResult,
+  addRecord,
+  FoodRecognitionResult, 
+  FoodItem 
+} from '../services/api';
+import { useNavigation } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
 
 const FoodRecognitionScreen = () => {
+  const navigation = useNavigation();
   const [image, setImage] = useState<string | null>(null);
   const [requestId, setRequestId] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [result, setResult] = useState<FoodRecognitionResult | null>(null);
   const [loading, setLoading] = useState(false);
+  const [savingRecord, setSavingRecord] = useState(false);
+  const [showForm, setShowForm] = useState(false);
 
   // Check status periodically if we have a request in progress
   useEffect(() => {
@@ -52,6 +66,7 @@ const FoodRecognitionScreen = () => {
       setRequestId(null);
       setStatus(null);
       setResult(null);
+      setShowForm(false);
     }
   };
 
@@ -76,6 +91,7 @@ const FoodRecognitionScreen = () => {
       setRequestId(null);
       setStatus(null);
       setResult(null);
+      setShowForm(false);
     }
   };
 
@@ -88,25 +104,29 @@ const FoodRecognitionScreen = () => {
       const response = await fetch(image);
       const blob = await response.blob();
       
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = async () => {
+      const reader = new FileReader();
+      
+      const readPromise = new Promise<string>((resolve, reject) => {
+        reader.onload = () => {
           try {
             const base64data = (reader.result as string).split(',')[1];
-            const mimeType = blob.type;
-            
-            // Send to API
-            const id = await recognizeFood(base64data, mimeType);
-            setRequestId(id);
-            setStatus('Waiting');
-            resolve(id);
+            resolve(base64data);
           } catch (error) {
             reject(error);
           }
         };
         reader.onerror = reject;
-        reader.readAsDataURL(blob);
       });
+      
+      reader.readAsDataURL(blob);
+      
+      const base64data = await readPromise;
+      const mimeType = blob.type;
+      
+      // Send to API
+      const id = await recognizeFood(base64data, mimeType);
+      setRequestId(id);
+      setStatus('Waiting');
     } catch (error: any) {
       Alert.alert('Recognition Failed', error.message);
     } finally {
@@ -131,76 +151,153 @@ const FoodRecognitionScreen = () => {
     try {
       const data = await getFoodRecognitionResult(requestId);
       setResult(data);
+      setShowForm(true);
     } catch (error: any) {
       console.error('Error getting result:', error);
       Alert.alert('Error', 'Failed to get recognition results');
     }
   };
 
-  const renderResult = () => {
-    if (!result || !result.products || result.products.length === 0) {
-      return <Text style={styles.noResultText}>No results available</Text>;
+  const handleUpdateFoodItem = async (index: number, updatedItem: FoodItem) => {
+    if (!result || !requestId) return;
+    
+    const updatedProducts = [...result.products];
+    updatedProducts[index] = updatedItem;
+    
+    const updatedResult = {
+      ...result,
+      products: updatedProducts
+    };
+    
+    setResult(updatedResult);
+    
+    try {
+      // Send updated results to backend
+      await editFoodRecognitionResult(requestId, updatedResult);
+    } catch (error: any) {
+      console.error('Error updating food item:', error);
+      Alert.alert('Error', 'Failed to update food item');
     }
+  };
 
-    return (
-      <View style={styles.resultContainer}>
-        <Text style={styles.resultTitle}>Food Recognition Results:</Text>
-        {result.products.map((item: FoodItem, index: number) => (
-          <View key={index} style={styles.foodItem}>
-            <Text style={styles.foodName}>{item.name}</Text>
-            <View style={styles.nutritionInfo}>
-              <Text style={styles.nutritionText}>Carbs: {item.carbs}g</Text>
-              <Text style={styles.nutritionText}>Weight: {item.grams}g</Text>
-            </View>
-          </View>
-        ))}
-      </View>
-    );
+  const handleSaveRecord = async (data: {
+    insulin: string;
+    carbohydrates: string;
+    timeCoefficient: string;
+    sportCoefficient: string;
+    personalCoefficient: string;
+    foodRecognitionId?: string;
+  }) => {
+    setSavingRecord(true);
+    try {
+      await addRecord(
+        data.timeCoefficient,
+        data.sportCoefficient,
+        data.personalCoefficient,
+        data.insulin,
+        data.carbohydrates,
+        data.foodRecognitionId || undefined
+      );
+      
+      Alert.alert('Success', 'Record saved successfully',
+        [{ text: 'OK', onPress: resetForm }]
+      );
+    } catch (error: any) {
+      console.error('Error saving record:', error);
+      Alert.alert('Error', 'Failed to save record');
+    } finally {
+      setSavingRecord(false);
+    }
+  };
+
+  const resetForm = () => {
+    setImage(null);
+    setRequestId(null);
+    setStatus(null);
+    setResult(null);
+    setShowForm(false);
+  };
+
+  const handleManualEntry = () => {
+    setShowForm(true);
+    setResult(null);
+    setRequestId(null);
+    setStatus(null);
   };
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.contentContainer}>
       <Text style={styles.title}>Food Recognition</Text>
       
-      <View style={styles.imageContainer}>
-        {image ? (
-          <Image source={{ uri: image }} style={styles.foodImage} />
-        ) : (
-          <View style={styles.placeholderImage}>
-            <Text style={styles.placeholderText}>No image selected</Text>
+      {!showForm ? (
+        <>
+          <View style={styles.imageContainer}>
+            {image ? (
+              <Image source={{ uri: image }} style={styles.foodImage} />
+            ) : (
+              <View style={styles.placeholderImage}>
+                <Text style={styles.placeholderText}>No image selected</Text>
+              </View>
+            )}
           </View>
-        )}
-      </View>
-      
-      <View style={styles.buttonGroup}>
-        <Button title="Choose from Gallery" onPress={pickImage} style={styles.button} />
-        <Button title="Take Photo" onPress={takePicture} style={styles.button} />
-      </View>
-      
-      {image && !requestId && (
-        <Button 
-          title="Recognize Food" 
-          onPress={startRecognition} 
-          loading={loading} 
-          style={styles.recognizeButton} 
-        />
-      )}
-      
-      {status && (
-        <View style={styles.statusContainer}>
-          <Text style={styles.statusText}>
-            Status: <Text style={styles.statusValue}>{status}</Text>
-          </Text>
-          {(status === 'Waiting' || status === 'Processing') && (
-            <Text style={styles.processingText}>Processing your image...</Text>
+          
+          <View style={styles.buttonGroup}>
+            <Button title="Choose from Gallery" onPress={pickImage} style={styles.button} />
+            <Button title="Take Photo" onPress={takePicture} style={styles.button} />
+          </View>
+          
+          {image && !requestId && (
+            <Button 
+              title="Recognize Food" 
+              onPress={startRecognition} 
+              loading={loading} 
+              style={styles.recognizeButton} 
+            />
           )}
-          {status === 'Error' && (
-            <Text style={styles.errorText}>An error occurred during processing.</Text>
+          
+          <View style={styles.divider}>
+            <View style={styles.line} />
+            <Text style={styles.orText}>OR</Text>
+            <View style={styles.line} />
+          </View>
+          
+          <Button 
+            title="Manual Entry" 
+            onPress={handleManualEntry} 
+            style={styles.manualButton} 
+          />
+          
+          {status && (
+            <View style={styles.statusContainer}>
+              <Text style={styles.statusText}>
+                Status: <Text style={styles.statusValue}>{status}</Text>
+              </Text>
+              {(status === 'Waiting' || status === 'Processing') && (
+                <Text style={styles.processingText}>Processing your image...</Text>
+              )}
+              {status === 'Error' && (
+                <Text style={styles.errorText}>An error occurred during processing.</Text>
+              )}
+            </View>
           )}
-        </View>
+        </>
+      ) : (
+        <>
+          <TouchableOpacity style={styles.backButton} onPress={resetForm}>
+            <Ionicons name="arrow-back" size={24} color="#4CAF50" />
+            <Text style={styles.backButtonText}>Back</Text>
+          </TouchableOpacity>
+          
+          <RecordForm
+            foodRecognitionResult={result}
+            foodRecognitionId={requestId || undefined}
+            onUpdateFoodItem={handleUpdateFoodItem}
+            onSubmit={handleSaveRecord}
+            submitButtonText="Save Record"
+            isLoading={savingRecord}
+          />
+        </>
       )}
-      
-      {status === 'Done' && renderResult()}
     </ScrollView>
   );
 };
@@ -219,6 +316,16 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 20,
     textAlign: 'center',
+  },
+  backButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  backButtonText: {
+    fontSize: 16,
+    color: '#4CAF50',
+    marginLeft: 5,
   },
   imageContainer: {
     width: '100%',
@@ -252,6 +359,24 @@ const styles = StyleSheet.create({
   },
   recognizeButton: {
     backgroundColor: '#FF9800',
+    marginBottom: 20,
+  },
+  manualButton: {
+    backgroundColor: '#2196F3',
+  },
+  divider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  line: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#ddd',
+  },
+  orText: {
+    marginHorizontal: 10,
+    color: '#888',
   },
   statusContainer: {
     marginTop: 20,
@@ -277,45 +402,6 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#F44336',
-  },
-  resultContainer: {
-    marginTop: 20,
-    padding: 15,
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  resultTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  foodItem: {
-    padding: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  foodName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  nutritionInfo: {
-    flexDirection: 'row',
-    marginTop: 5,
-  },
-  nutritionText: {
-    marginRight: 15,
-    color: '#666',
-  },
-  noResultText: {
-    textAlign: 'center',
-    color: '#666',
-    marginTop: 20,
-    fontStyle: 'italic',
   }
 });
 
