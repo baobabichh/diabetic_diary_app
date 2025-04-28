@@ -42,6 +42,7 @@ const RecordForm: React.FC<RecordFormProps> = ({
   const [timeCoefficient, setTimeCoefficient] = useState(initialTimeCoefficient);
   const [sportCoefficient, setSportCoefficient] = useState(initialSportCoefficient);
   const [personalCoefficient, setPersonalCoefficient] = useState(initialPersonalCoefficient);
+  const [manualInsulin, setManualInsulin] = useState(false);
   const [errors, setErrors] = useState({
     insulin: '',
     carbohydrates: '',
@@ -49,6 +50,13 @@ const RecordForm: React.FC<RecordFormProps> = ({
     sportCoefficient: '',
     personalCoefficient: '',
   });
+
+  // Calculate insulin dose automatically when any dependent value changes
+  useEffect(() => {
+    if (!manualInsulin) {
+      calculateInsulinDose();
+    }
+  }, [carbohydrates, timeCoefficient, sportCoefficient, personalCoefficient, manualInsulin]);
 
   // Update carbs when food items change
   useEffect(() => {
@@ -60,6 +68,32 @@ const RecordForm: React.FC<RecordFormProps> = ({
       setCarbohydrates(totalCarbs.toString());
     }
   }, [foodRecognitionResult]);
+
+  const calculateInsulinDose = () => {
+    // Only calculate if carbs is a valid number
+    if (carbohydrates && !isNaN(Number(carbohydrates))) {
+      const carbs = parseFloat(carbohydrates) || 0;
+      const tCoeff = parseFloat(timeCoefficient) || 1.0;
+      const sCoeff = parseFloat(sportCoefficient) || 1.0;
+      const pCoeff = parseFloat(personalCoefficient) || 1.0;
+
+      // Formula: insulin = Carbohydrates / 10 * PersonalCoefficient * SportCoefficient * TimeCoefficient
+      const calculatedInsulin = (carbs / 10) * pCoeff * sCoeff * tCoeff;
+
+      // Round to 1 decimal place
+      setInsulin(calculatedInsulin.toFixed(1));
+    }
+  };
+
+  const handleInsulinChange = (value: string) => {
+    setManualInsulin(true);
+    setInsulin(value);
+  };
+
+  const resetToCalculatedInsulin = () => {
+    setManualInsulin(false);
+    calculateInsulinDose();
+  };
 
   const validateForm = () => {
     let isValid = true;
@@ -122,17 +156,16 @@ const RecordForm: React.FC<RecordFormProps> = ({
     if (!foodRecognitionResult || !onUpdateFoodItem) return;
 
     const updatedItem = { ...foodRecognitionResult.products[index] };
-    
+
     if (field === 'name') {
       updatedItem.name = value;
     } else if (field === 'grams') {
       const newGrams = parseFloat(value) || 0;
-      const oldGrams = updatedItem.grams;
-      const ratio = newGrams / oldGrams;
-      
+      const ratio = updatedItem.ratio;
+
       // Update carbs proportionally
       updatedItem.grams = newGrams;
-      updatedItem.carbs = Math.round(updatedItem.carbs * ratio * 10) / 10;
+      updatedItem.carbs = Math.round(newGrams / 100.0 * ratio)
     }
 
     onUpdateFoodItem(index, updatedItem);
@@ -145,12 +178,13 @@ const RecordForm: React.FC<RecordFormProps> = ({
           <Text style={styles.sectionTitle}>Recognized Food</Text>
           {foodRecognitionResult.products.map((item, index) => (
             <View key={index} style={styles.foodItem}>
-              <TextInput
+              {/* <TextInput
                 style={styles.foodNameInput}
                 value={item.name}
                 onChangeText={(value) => handleFoodItemUpdate(index, 'name', value)}
                 placeholder="Food name"
-              />
+              /> */}
+              <Text style={styles.foodNameInput}>{item.name}</Text>
               <View style={styles.foodDetails}>
                 <View style={styles.inputRow}>
                   <Text style={styles.label}>Grams:</Text>
@@ -182,7 +216,7 @@ const RecordForm: React.FC<RecordFormProps> = ({
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Record Details</Text>
-        
+
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Carbohydrates (g): <Text style={styles.required}>*</Text></Text>
           <TextInput
@@ -198,21 +232,40 @@ const RecordForm: React.FC<RecordFormProps> = ({
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Insulin (units): <Text style={styles.optional}>(optional)</Text></Text>
+          <View style={styles.labelRow}>
+            <Text style={styles.label}>Insulin (units):</Text>
+            {manualInsulin ? (
+              <TouchableOpacity onPress={resetToCalculatedInsulin}>
+                <Text style={styles.autoCalcLink}>Calculate automatically</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.autoCalcActive}>Auto-calculated</Text>
+            )}
+          </View>
           <TextInput
-            style={[styles.input, errors.insulin ? styles.inputError : null]}
+            style={[styles.input, errors.insulin ? styles.inputError : null, manualInsulin ? styles.manualInput : styles.autoInput]}
             value={insulin}
-            onChangeText={setInsulin}
+            onChangeText={handleInsulinChange}
             keyboardType="numeric"
             placeholder="0"
           />
           {errors.insulin ? (
             <Text style={styles.errorText}>{errors.insulin}</Text>
           ) : null}
+          {!manualInsulin && (
+            <Text style={styles.calculationNote}>
+              Formula: Carbs / 10 × Time × Sport × Personal
+            </Text>
+          )}
+        </View>
+
+        <View style={styles.coeffContainer}>
+          <Text style={styles.coeffTitle}>Coefficients</Text>
+          <Text style={styles.coeffNote}>These values affect insulin calculation</Text>
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Time Coefficient: <Text style={styles.optional}>(optional, default: 1.0)</Text></Text>
+          <Text style={styles.label}>Time Coefficient:</Text>
           <TextInput
             style={[styles.input, errors.timeCoefficient ? styles.inputError : null]}
             value={timeCoefficient}
@@ -226,7 +279,7 @@ const RecordForm: React.FC<RecordFormProps> = ({
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Sport Coefficient: <Text style={styles.optional}>(optional, default: 1.0)</Text></Text>
+          <Text style={styles.label}>Sport Coefficient:</Text>
           <TextInput
             style={[styles.input, errors.sportCoefficient ? styles.inputError : null]}
             value={sportCoefficient}
@@ -240,7 +293,7 @@ const RecordForm: React.FC<RecordFormProps> = ({
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Personal Coefficient: <Text style={styles.optional}>(optional, default: 1.0)</Text></Text>
+          <Text style={styles.label}>Personal Coefficient:</Text>
           <TextInput
             style={[styles.input, errors.personalCoefficient ? styles.inputError : null]}
             value={personalCoefficient}
@@ -298,6 +351,12 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 15,
   },
+  labelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 5,
+  },
   label: {
     fontSize: 14,
     marginBottom: 5,
@@ -312,6 +371,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontStyle: 'italic',
   },
+  autoCalcActive: {
+    fontSize: 12,
+    color: '#4CAF50',
+    fontWeight: 'bold',
+  },
+  autoCalcLink: {
+    fontSize: 12,
+    color: '#2196F3',
+    textDecorationLine: 'underline',
+  },
+  calculationNote: {
+    fontSize: 12,
+    color: '#757575',
+    fontStyle: 'italic',
+    marginTop: 5,
+  },
   input: {
     borderWidth: 1,
     borderColor: '#ddd',
@@ -319,12 +394,35 @@ const styles = StyleSheet.create({
     padding: 10,
     fontSize: 16,
   },
+  manualInput: {
+    backgroundColor: '#fff',
+  },
+  autoInput: {
+    backgroundColor: '#f0f8ff',
+  },
   inputError: {
     borderColor: 'red',
   },
   errorText: {
     color: 'red',
     fontSize: 12,
+    marginTop: 5,
+  },
+  coeffContainer: {
+    marginTop: 10,
+    marginBottom: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  coeffTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  coeffNote: {
+    fontSize: 12,
+    color: '#757575',
     marginTop: 5,
   },
   foodItem: {

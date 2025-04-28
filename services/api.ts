@@ -137,7 +137,6 @@ export const editFoodRecognitionResult = async (requestId: string, newData: Food
     console.log("Edit result response status:", response);
 
     const data = await response.json();
-    console.log("Edit result response data:", data);
 
     if (!response.ok) {
       throw new Error(data.Msg || 'Failed to edit result');
@@ -155,6 +154,7 @@ export interface FoodItem {
   name: string;
   carbs: number;
   grams: number;
+  ratio: number;
 }
 
 export interface FoodRecognitionResult {
