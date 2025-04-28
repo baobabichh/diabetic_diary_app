@@ -30,7 +30,7 @@ const FoodRecognitionScreen = () => {
     let interval: NodeJS.Timeout;
     
     if (requestId && (status === 'Waiting' || status === 'Processing')) {
-      interval = setInterval(checkStatus, 3000);
+      interval = setInterval(checkStatus, 1000);
     }
     
     return () => {
