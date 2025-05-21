@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Replace with your actual backend URL
-const API_URL = 'http://172.26.132.77:5050';
+const API_URL = 'http://157.180.95.211:5050';
 
 export const addRecord = async (
   timeCoefficient: string,
