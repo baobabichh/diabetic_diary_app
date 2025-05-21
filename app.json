@@ -28,8 +28,7 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.goshan9.foodrecognitionapp",
-      "usesCleartextTraffic": true
+      "package": "com.goshan9.foodrecognitionapp"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -41,11 +40,19 @@
           "photosPermission": "The app needs access to your photos to let you upload food images.",
           "cameraPermission": "The app needs access to your camera to let you take food photos."
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
       ]
     ],
     "extra": {
       "eas": {
-        "projectId": "41b50ccb-a0cc-40db-b729-476bcbc42eab"
+        "projectId": "d983a574-e3a5-4339-86bf-fd4ce1c6d514"
       }
     }
   }

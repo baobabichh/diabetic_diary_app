@@ -251,6 +251,8 @@ export const recognizeFood = async (base64Image: string, mimeType: string): Prom
     params.append('base64_string', base64Image);
     params.append('mime_type', mimeType);
 
+    console.log( "params.toString().length(): ", params.toString().length);
+
     const response = await fetch(`${API_URL}/recognize_food`, {
       method: 'POST',
       headers: {
