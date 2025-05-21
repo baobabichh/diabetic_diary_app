@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Food Recognition App",
-    "slug": "food-recognition-app",
+    "name": "Diabetes Diary",
+    "slug": "diabetes-diary-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -28,7 +28,8 @@
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "android.permission.RECORD_AUDIO"
       ],
-      "package": "com.goshan9.foodrecognitionapp"
+      "package": "com.goshan9.foodrecognitionapp",
+      "usesCleartextTraffic": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
